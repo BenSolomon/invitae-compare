@@ -6,12 +6,16 @@ library(shinycssloaders)
 library(RSelenium)
 library(netstat)
 library(tibble)
+library(rvest)
 
 # TO DO
-## CSS Spinners
 ## Support for custom gene lists
 ## URL error check
 ## Full gene list error check (compare scrape length to published number on page)
+## RSelenium speed
+  # [X] Optimize findElement for genes
+  # [ ] Single site navigation for genes, title, count?
+
 object_to_row <- function(x){
   names(x) <- deparse(substitute(x)) 
   enframe(x, "element", "value")
@@ -58,12 +62,24 @@ try_seleniumQuery <- function(expr) {
   )
 }
 
-get_invitae_genes <- function(url){
+## Old, slower version
+# get_invitae_genes <- function(url){
+#   remDr$navigate(url)
+#   show_genes <- try_seleniumQuery(remDr$findElement(using = "xpath", "//div[contains(text(), 'Show all genes')]"))
+#   if (!class(show_genes) == "try-error") {show_genes$clickElement()}
+#   genes <- remDr$findElements(using = "xpath", "//div[contains(@class, 'GeneTileItem_geneTitle')]")
+#   unlist(lapply(genes, function(x) {x$getElementText()}))
+# }
+
+get_invitae_genes <- function(url) {
   remDr$navigate(url)
   show_genes <- try_seleniumQuery(remDr$findElement(using = "xpath", "//div[contains(text(), 'Show all genes')]"))
   if (!class(show_genes) == "try-error") {show_genes$clickElement()}
-  genes <- remDr$findElements(using = "xpath", "//div[contains(@class, 'GeneTileItem_geneTitle')]")
-  unlist(lapply(genes, function(x) {x$getElementText()}))
+  genes <- remDr$findElement(using = "xpath", "//div[contains(@class, 'GeneTiles_geneTilesWrapper')]")
+  genes$getElementAttribute("outerHTML")[[1]] %>% 
+    read_html() %>%
+    html_nodes(xpath = "//div[contains(@class, 'GeneTileItem_geneTitle')]") %>%
+    html_text()
 }
 
 get_invitae_name <- function(url){
@@ -76,6 +92,8 @@ get_invitae_gene_count <- function(url){
   count <- remDr$findElement(using = "xpath", "//div[contains(@id, 'panelGenesCountExpanded')]")
   as.numeric(gsub("[a-zA-Z ]", "", unlist(count$getElementText())))
 }
+
+
 
 # Some panel defaults
 invitae_ibd <- "https://www.invitae.com/en/providers/test-catalog/test-08122"
