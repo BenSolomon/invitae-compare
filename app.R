@@ -6,6 +6,13 @@ library(shinycssloaders)
 library(RSelenium)
 library(netstat)
 
+# TO DO
+## CSS Spinners
+## Support for custom gene lists
+## URL error check
+## Full gene list error check (compare scrape length to published number on page)
+
+
 eCaps <- list(chromeOptions = list(
   args = c('--headless', '--disable-gpu', '--window-size=1280,800')
 ))
@@ -15,6 +22,7 @@ eCaps <- list(chromeOptions = list(
 ## and this switch allows single script to work for both
 if (Sys.info()['sysname'] == "Linux"){
   remDr <- remoteDriver(port = 4444L, extraCapabilities = eCaps, browser = "chrome")
+  remDr$open()
 }
 if (Sys.info()['sysname'] == "Windows"){
   rsD <- rsDriver(browser = 'chrome',
