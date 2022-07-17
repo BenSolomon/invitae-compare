@@ -5,21 +5,25 @@ library(dplyr)
 library(shinycssloaders)
 library(RSelenium)
 library(netstat)
+library(tibble)
 
 # TO DO
 ## CSS Spinners
 ## Support for custom gene lists
 ## URL error check
 ## Full gene list error check (compare scrape length to published number on page)
-
+object_to_row <- function(x){
+  names(x) <- deparse(substitute(x)) 
+  enframe(x, "element", "value")
+}
 
 eCaps <- list(chromeOptions = list(
   args = c('--headless', '--disable-gpu', '--window-size=1280,800')
 ))
 
 # Establishing RSelenium client
-## I have set up Selenium differently on my windows vs. linux machines 
-## and this switch allows single script to work for both
+# I have set up Selenium differently on my windows vs. linux machines
+# and this switch allows single script to work for both
 if (Sys.info()['sysname'] == "Linux"){
   remDr <- remoteDriver(port = 4444L, extraCapabilities = eCaps, browser = "chrome")
   remDr$open()
@@ -65,6 +69,12 @@ get_invitae_genes <- function(url){
 get_invitae_name <- function(url){
   remDr$navigate(url)
   gsub("Invitae | \\|.*", "", unlist(remDr$getTitle()))
+}
+
+get_invitae_gene_count <- function(url){
+  remDr$navigate(url)
+  count <- remDr$findElement(using = "xpath", "//div[contains(@id, 'panelGenesCountExpanded')]")
+  as.numeric(gsub("[a-zA-Z ]", "", unlist(count$getElementText())))
 }
 
 # Some panel defaults
@@ -121,29 +131,12 @@ ui <-
                                 )
                             )),
                mainPanel(
-                 fluidRow(column(4, div(
-                   # textOutput("title1", container = h3),
-                   # br(),
-                   DT::dataTableOutput("table1")
-                 )),
-                 column(4, div(
-                   # textOutput("title_shared", container = h3), 
-                   # br(), 
-                   DT::dataTableOutput("table_shared")
-                 )),
-                 column(4, div(
-                   # textOutput("title2", container = h3), 
-                   # br(), 
-                   DT::dataTableOutput("table2")
-                 ))), 
-                 # withSpinner(
-                 withSpinner(verbatimTextOutput("panel_1"))
-                 # withSpinner(plotOutput("plot"))
-                 # ,
-                   # verbatimTextOutput("panel_2")
-                   # DT::dataTableOutput("mytable")
-                             # )
-             )))
+                 fluidRow(column(4, withSpinner(DT::dataTableOutput("table1"))),
+                          column(4, withSpinner(DT::dataTableOutput("table_shared"))),
+                          column(4, withSpinner(DT::dataTableOutput("table2")))), 
+                 div(h3("Debug"), withSpinner(DT::dataTableOutput("debug_table")))
+             )
+             ))
   )
 
 
@@ -183,7 +176,7 @@ server <- function(input, output) {
   # title_panel_2 <- eventReactive(input$go, {"Genes unique to panel 2"})
   title_shared <- eventReactive(input$go, {"Genes shared by both panels"})
   
-  # Dynamic panel names
+  # # Dynamic panel names
   title_panel_1 <- eventReactive(input$go, {
     panel <- get_invitae_name(input$panel_1)
     sprintf("Genes unique to %s", panel)})
@@ -206,6 +199,25 @@ server <- function(input, output) {
   output$table_shared <- DT::renderDataTable({build_DT(tibble(shared_genes()), title = title_shared())})
   output$table2 <- DT::renderDataTable({build_DT(tibble(genes_panel_2_unique()), title = title_panel_2())})
   
+  
+  panel_1_length <- reactive({length(genes_panel_1())})
+  panel_2_length <- reactive({length(genes_panel_2())})
+  shared_length <- reactive({length(shared_genes())})
+  
+  expected_1_length <- eventReactive(input$go, {get_invitae_gene_count(input$panel_1)})
+  expected_2_length <- eventReactive(input$go, {get_invitae_gene_count(input$panel_2)})
+  
+  debug <- reactive({as.data.frame(bind_rows(
+   object_to_row(panel_1_length()), 
+   object_to_row(panel_2_length()), 
+   object_to_row(shared_length()), 
+   object_to_row(expected_1_length()), 
+   object_to_row(expected_2_length()) 
+  ))})
+  
+  output$debug_table <- DT::renderDataTable({datatable(debug(), rownames = F)})
 }
 
 shinyApp(ui, server)
+
+
