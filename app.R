@@ -14,7 +14,8 @@ library(rvest)
 ## Full gene list error check (compare scrape length to published number on page)
 ## RSelenium speed
   # [X] Optimize findElement for genes
-  # [ ] Single site navigation for genes, title, count?
+  # [X] Single site navigation for genes, title, count?
+    # Still takes a long time to run
 
 object_to_row <- function(x){
   names(x) <- deparse(substitute(x)) 
@@ -71,8 +72,8 @@ try_seleniumQuery <- function(expr) {
 #   unlist(lapply(genes, function(x) {x$getElementText()}))
 # }
 
-get_invitae_genes <- function(url) {
-  remDr$navigate(url)
+get_invitae_genes <- function(remDr) {
+  # remDr$navigate(url)
   show_genes <- try_seleniumQuery(remDr$findElement(using = "xpath", "//div[contains(text(), 'Show all genes')]"))
   if (!class(show_genes) == "try-error") {show_genes$clickElement()}
   genes <- remDr$findElement(using = "xpath", "//div[contains(@class, 'GeneTiles_geneTilesWrapper')]")
@@ -82,18 +83,25 @@ get_invitae_genes <- function(url) {
     html_text()
 }
 
-get_invitae_name <- function(url){
-  remDr$navigate(url)
+get_invitae_name <- function(remDr){
+  # remDr$navigate(url)
   gsub("Invitae | \\|.*", "", unlist(remDr$getTitle()))
 }
 
-get_invitae_gene_count <- function(url){
-  remDr$navigate(url)
+get_invitae_gene_count <- function(remDr){
+  # remDr$navigate(url)
   count <- remDr$findElement(using = "xpath", "//div[contains(@id, 'panelGenesCountExpanded')]")
   as.numeric(gsub("[a-zA-Z ]", "", unlist(count$getElementText())))
 }
 
-
+invitae_pipeline <- function(url){
+  remDr$navigate(url)
+  list(
+    panel_name = get_invitae_name(remDr),
+    panel_length = get_invitae_gene_count(remDr),
+    panel_genes = get_invitae_genes(remDr)
+  )
+}
 
 # Some panel defaults
 invitae_ibd <- "https://www.invitae.com/en/providers/test-catalog/test-08122"
@@ -189,25 +197,33 @@ build_DT <- function(df, title){
 
 server <- function(input, output) {
   
+  panel_1_data <- eventReactive(input$go, {invitae_pipeline(input$panel_1)})
+  panel_2_data <- eventReactive(input$go, {invitae_pipeline(input$panel_2)})
+  
   # Static panel names
   # title_panel_1 <- eventReactive(input$go, {"Genes unique to panel 1"})
   # title_panel_2 <- eventReactive(input$go, {"Genes unique to panel 2"})
   title_shared <- eventReactive(input$go, {"Genes shared by both panels"})
   
   # # Dynamic panel names
-  title_panel_1 <- eventReactive(input$go, {
-    panel <- get_invitae_name(input$panel_1)
-    sprintf("Genes unique to %s", panel)})
-  title_panel_2 <- eventReactive(input$go, {
-    panel <- get_invitae_name(input$panel_2)
-    sprintf("Genes unique to %s", panel)})
+  # title_panel_1 <- eventReactive(input$go, {
+  #   panel <- get_invitae_name(input$panel_1)
+  #   sprintf("Genes unique to %s", panel)})
+  # title_panel_2 <- eventReactive(input$go, {
+  #   panel <- get_invitae_name(input$panel_2)
+  #   sprintf("Genes unique to %s", panel)})
+  title_panel_1 <- reactive({sprintf("Genes unique to %s", panel_1_data()$panel_name)})
+  title_panel_2 <- reactive({sprintf("Genes unique to %s", panel_2_data()$panel_name)})
   
   # Demo genes for debugging
   # genes_panel_1 <- eventReactive(input$go, {as.character(1:50)})
   # genes_panel_2 <- eventReactive(input$go, {as.character(26:75)})
   
-  genes_panel_1 <- eventReactive(input$go, {get_invitae_genes(input$panel_1)})
-  genes_panel_2 <- eventReactive(input$go, {get_invitae_genes(input$panel_2)})
+  
+  # genes_panel_1 <- eventReactive(input$go, {get_invitae_genes(input$panel_1)})
+  # genes_panel_2 <- eventReactive(input$go, {get_invitae_genes(input$panel_2)})
+  genes_panel_1 <- reactive({panel_1_data()$panel_genes})
+  genes_panel_2 <- reactive({panel_2_data()$panel_genes})
   
   shared_genes <- reactive({intersect(genes_panel_1(), genes_panel_2())})
   genes_panel_1_unique <- reactive({setdiff(genes_panel_1(), shared_genes())})
@@ -222,17 +238,19 @@ server <- function(input, output) {
   panel_2_length <- reactive({length(genes_panel_2())})
   shared_length <- reactive({length(shared_genes())})
   
-  expected_1_length <- eventReactive(input$go, {get_invitae_gene_count(input$panel_1)})
-  expected_2_length <- eventReactive(input$go, {get_invitae_gene_count(input$panel_2)})
+  # expected_1_length <- eventReactive(input$go, {get_invitae_gene_count(input$panel_1)})
+  # expected_2_length <- eventReactive(input$go, {get_invitae_gene_count(input$panel_2)})
+  expected_1_length <- reactive({panel_1_data()$panel_length})
+  expected_2_length <- reactive({panel_2_data()$panel_length})
   
   debug <- reactive({as.data.frame(bind_rows(
-   object_to_row(panel_1_length()), 
-   object_to_row(panel_2_length()), 
-   object_to_row(shared_length()), 
-   object_to_row(expected_1_length()), 
-   object_to_row(expected_2_length()) 
+   object_to_row(panel_1_length()),
+   object_to_row(panel_2_length()),
+   object_to_row(shared_length()),
+   object_to_row(expected_1_length()),
+   object_to_row(expected_2_length())
   ))})
-  
+
   output$debug_table <- DT::renderDataTable({datatable(debug(), rownames = F)})
 }
 
