@@ -109,7 +109,7 @@ server <- function(input, output) {
       "Panel 1 is not valid"))
     get_panel_html(input$panel_1)
   })
-  panel_1_name <- eventReactive(input$go, {get_panel_name(panel_1_html())})
+  panel_1_name <- eventReactive(input$go, {sprintf("%s - Unique genes", get_panel_name(panel_1_html()))})
   panel_1_genes <- eventReactive(input$go, {get_panel_genes(panel_1_html())})
   
   # Obtain panel 2 information
@@ -124,7 +124,7 @@ server <- function(input, output) {
   })
   ## Set name based on radio button
   panel_2_name <- eventReactive(input$go, {
-    if(input$panel_2_toggle=="invitae_panel"){get_panel_name(panel_2_html())}
+    if(input$panel_2_toggle=="invitae_panel"){sprintf("%s - Unique genes", get_panel_name(panel_2_html()))}
     else if(input$panel_2_toggle=="gene_list"){"Custom gene list"}
   })
   ## Set genes based on radio button
