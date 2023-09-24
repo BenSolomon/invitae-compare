@@ -60,6 +60,13 @@ build_DT <- function(df, title){
       # Center column values
       columnDefs = list(
         list(className = 'dt-center', targets = 0)
-      )
+      ),
+      language = list(
+        zeroRecords = "No additional genes")
     )
   )}
+
+valid_url <- function(url){
+  url_status <- attributes(curlGetHeaders(url))$status
+  ifelse(url_status >= 200 & url_status < 300, TRUE, FALSE)
+}

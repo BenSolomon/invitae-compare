@@ -94,6 +94,7 @@ ui <-
   )
 
 server <- function(input, output) {
+  invitae_base_url <- "https://www.invitae.com/en/providers/test-catalog/test-"
   
   # Check radio button specifies whether invitae panel or gene list is desired 
   # for panel 2 input and update text box as indicated
@@ -103,7 +104,9 @@ server <- function(input, output) {
   
   # Obtain panel 1 information
   panel_1_html <- eventReactive(input$go, {
-    shiny::validate(need(input$panel_1 == invitae_ibd, "Panel 1 is not valid"))
+    shiny::validate(need(
+      valid_url(sprintf("%s%s", invitae_base_url, input$panel_1)), 
+      "Panel 1 is not valid"))
     get_panel_html(input$panel_1)
   })
   panel_1_name <- eventReactive(input$go, {get_panel_name(panel_1_html())})
@@ -113,7 +116,9 @@ server <- function(input, output) {
   ## Get invitae HTML if radio button == invitae
   panel_2_html <- eventReactive(input$go, {
     if(input$panel_2_toggle=="invitae_panel"){
-      shiny::validate(need(input$panel_2_invitae == invitae_agam, "Panel 2 is not valid"))
+      shiny::validate(need(
+        valid_url(sprintf("%s%s", invitae_base_url, input$panel_2_invitae)), 
+        "Panel 2 is not valid"))
       get_panel_html(input$panel_2_invitae)
     }
   })
